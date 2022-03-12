@@ -1,0 +1,19 @@
+# CSV fields: <C type>,<Go type>,<cgo type>,<options>
+# note that C type 'T *' does not need to be specified here if 'T' is unless
+# it differs from the conventional mapping 'T *,*GoT,*C.T';
+# also structs and enums can be automatically inferred, again unless they
+# differ from the conventional mapping e.g. 'struct T,GoT,C.struct_T`
+void,,
+void *,unsafe.Pointer,
+nk_bool,bool,C.nk_bool
+char *,string,C.CString
+char,byte,C.char
+unsigned char,byte,C.uchar
+short,int16,C.short
+unsigned short,uint16,C.ushort
+int,int32,C.int
+unsigned int,uint32,C.uint
+long,int64,C.long
+unsigned long,uint64,C.ulong
+float,float32,C.float
+double,float64,C.double

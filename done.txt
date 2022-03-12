@@ -1,0 +1,3 @@
+func (*Context) LayoutRowStatic(float32, int32, int32)
+func (*Context) LayoutRowDynamic(float32, int32)
+func (*Context) StyleSetFont(*UserFont)
