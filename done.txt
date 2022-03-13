@@ -1,3 +1,6 @@
+func (*Context) ButtonText(string) bool
+func (*Context) CheckText(string, bool) bool
 func (*Context) LayoutRowStatic(float32, int32, int32)
 func (*Context) LayoutRowDynamic(float32, int32)
 func (*Context) StyleSetFont(*UserFont)
+func (*Context) Text(string, TextAlign)

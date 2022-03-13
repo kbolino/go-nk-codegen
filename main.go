@@ -18,10 +18,6 @@ func main() {
 }
 
 func run() error {
-	funcs, err := parseCFuncs(*flagHeader)
-	if err != nil {
-		return fmt.Errorf("parsing C functions in file '%s': %w", *flagHeader, err)
-	}
 	patterns, err := parsePatterns(*flagPatterns)
 	if err != nil {
 		return fmt.Errorf("parsing patterns in file '%s': %w", *flagPatterns, err)
@@ -34,23 +30,26 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("parsing typemap in file '%s': %w", *flagTypemap, err)
 	}
-	for _, f := range funcs {
+	funcs, err := parseCFuncs(*flagHeader, func(name string) bool {
 		skip := true
 		for _, pattern := range patterns {
-			if match := pattern.Regexp.FindStringIndex(f.Name); match == nil {
+			if match := pattern.Regexp.FindStringIndex(name); match == nil {
 				continue
 			}
 			if pattern.Negate {
-				debugf("skipping function %s because of negated pattern %s", f.Name, pattern.Regexp)
+				debugf("skipping function %s because of negated pattern %s", name, pattern.Regexp)
 				skip = true
 			} else {
-				debugf("including function %s because of pattern %s", f.Name, pattern.Regexp)
+				debugf("including function %s because of pattern %s", name, pattern.Regexp)
 				skip = false
 			}
 		}
-		if skip {
-			continue
-		}
+		return skip
+	})
+	if err != nil {
+		return fmt.Errorf("parsing C functions in file '%s': %w", *flagHeader, err)
+	}
+	for _, f := range funcs {
 		nakedName := strings.TrimPrefix(f.Name, "nk_")
 		goFuncName := strcase.ToCamel(nakedName)
 		method := true

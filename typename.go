@@ -14,7 +14,7 @@ func makeFuncParams(paramList *cc.ParameterList) ([]FunctionParam, error) {
 	//   : parameter_declaration
 	//   | parameter_list ',' parameter_declaration
 	//   ;
-	for pl := paramList; pl != nil; pl = pl.ParameterList {
+	for pl, i := paramList, 0; pl != nil; pl, i = pl.ParameterList, i+1 {
 		// parameter_declaration
 		//   : declaration_specifiers declarator
 		//   | declaration_specifiers abstract_declarator
@@ -23,14 +23,18 @@ func makeFuncParams(paramList *cc.ParameterList) ([]FunctionParam, error) {
 		pd := pl.ParameterDeclaration
 		var paramType strings.Builder
 		var name string
-		writeDeclSpec(&paramType, pd.DeclarationSpecifiers)
+		if err := writeDeclSpec(&paramType, pd.DeclarationSpecifiers); err != nil {
+			return nil, fmt.Errorf("computing declaration_specifier for parameter %d: %w", i, err)
+		}
 		if decl := pd.Declarator; decl != nil {
 			// declarator
 			//   : pointer direct_declarator
 			//   | direct_declarator
 			//   ;
 			if ptr := decl.Pointer; ptr != nil {
-				writePointer(&paramType, ptr)
+				if err := writePointer(&paramType, ptr); err != nil {
+					return nil, fmt.Errorf("computing declarator pointer for parameter %d: %w", i, err)
+				}
 			}
 			if dirDecl := decl.DirectDeclarator; dirDecl != nil {
 				// direct_declarator
@@ -57,7 +61,9 @@ func makeFuncParams(paramList *cc.ParameterList) ([]FunctionParam, error) {
 			//   | pointer direct_abstract_declarator
 			//   ;
 			if ptr := absDecl.Pointer; ptr != nil {
-				writePointer(&paramType, ptr)
+				if err := writePointer(&paramType, ptr); err != nil {
+					return nil, fmt.Errorf("computing abstract_declarator pointer for parameter %d: %w", i, err)
+				}
 			}
 			if dirAbsDecl := absDecl.DirectAbstractDeclarator; dirAbsDecl != nil {
 				return nil, errors.New("direct_abstract_declarator found")
@@ -177,6 +183,10 @@ func writeTypeSpec(dst *strings.Builder, typeSpec *cc.TypeSpecifier) error {
 		dst.WriteString("float ")
 	case cc.TypeSpecifierDouble:
 		dst.WriteString("double ")
+	case cc.TypeSpecifierSigned:
+		dst.WriteString("signed ")
+	case cc.TypeSpecifierUnsigned:
+		dst.WriteString("unsigned ")
 	case cc.TypeSpecifierBool:
 		dst.WriteString("bool ")
 	case cc.TypeSpecifierComplex:

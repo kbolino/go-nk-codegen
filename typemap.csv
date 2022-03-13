@@ -3,17 +3,39 @@
 # it differs from the conventional mapping 'T *,*GoT,*C.T';
 # also structs and enums can be automatically inferred, again unless they
 # differ from the conventional mapping e.g. 'struct T,GoT,C.struct_T`
+
+# voids
 void,,
 void *,unsafe.Pointer,
+
+# 1-byte types
 nk_bool,bool,C.nk_bool
 char *,string,C.CString
 char,byte,C.char
+nk_byte,byte,C.nk_byte
 unsigned char,byte,C.uchar
+
+# 2-byte types
 short,int16,C.short
 unsigned short,uint16,C.ushort
+nk_ushort,uint16,C.nk_ushort
+
+# 4-byte types
 int,int32,C.int
 unsigned int,uint32,C.uint
+unsigned,uint32,C.uint
+nk_uint,uint32,C.nk_uint
+nk_flags,Flags,C.nk_flags
+nk_rune,rune,C.nk_rune
+
+# 8-byte types
 long,int64,C.long
 unsigned long,uint64,C.ulong
+nk_ulong,uint64,C.nk_ulong
 float,float32,C.float
 double,float64,C.double
+
+# platform-width types
+size_t,uintptr,C.size_t
+nk_size,uintptr,C.nk_size
+nk_handle,Handle,C.nk_handle

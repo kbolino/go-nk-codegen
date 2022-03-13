@@ -25,6 +25,7 @@ const (
 )
 
 func convertType(typeMap map[string]TypeConv, cType string, options ConvertTypeOpts) (goType string, cgoType string, err error) {
+	debugf("converting type '%s'", cType)
 	cType = strings.TrimPrefix(cType, "const ")
 	if mapping, ok := typeMap[cType]; ok {
 		return mapping.GoType, mapping.CgoType, nil
@@ -33,9 +34,9 @@ func convertType(typeMap map[string]TypeConv, cType string, options ConvertTypeO
 		cType = strings.TrimSpace(strings.TrimSuffix(cType, "*"))
 		rawGoType, rawCgoType, err := convertType(typeMap, cType, options)
 		if err != nil {
-			return "", "", err
+			return "", "", fmt.Errorf("resolving type '%s': %w", cType, err)
 		}
-		return "*" + rawGoType, "*" + rawCgoType, err
+		return "*" + rawGoType, "*" + rawCgoType, nil
 	}
 	if options&ConvertTypeAutoStructEnum != 0 && strings.HasPrefix(cType, "struct ") {
 		cType = strings.TrimPrefix(cType, "struct ")

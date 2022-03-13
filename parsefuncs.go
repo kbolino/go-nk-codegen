@@ -18,7 +18,7 @@ type FunctionParam struct {
 	Type string
 }
 
-func parseCFuncs(fileName string) ([]FunctionDecl, error) {
+func parseCFuncs(fileName string, skip func(name string) bool) ([]FunctionDecl, error) {
 	debug("determing host configuration from C preprocessor")
 	predefined, includePaths, sysIncludePaths, err := cc.HostConfig(*flagCPP)
 	if err != nil {
@@ -87,6 +87,9 @@ func parseCFuncs(fileName string) ([]FunctionDecl, error) {
 		//   | direct_declarator
 		//   ;
 		decl := idecl.Declarator
+		if skip(decl.Name().String()) {
+			continue
+		}
 		// direct_declarator
 		//   : IDENTIFIER
 		//   | '(' declarator ')'
@@ -108,12 +111,10 @@ func parseCFuncs(fileName string) ([]FunctionDecl, error) {
 			case cc.ParameterTypeListList:
 				params, err = makeFuncParams(ddecl.ParameterTypeList.ParameterList)
 				if err != nil {
-					debugf("skipping function '%s' due to error making parameters: %s", decl.Name(), err)
-					continue
+					return nil, fmt.Errorf("cannot resolve parameters for function %s: %w", decl.Name(), err)
 				}
 			case cc.ParameterTypeListVar:
-				debugf("ignoring varargs function %s", decl.Name())
-				continue
+				return nil, fmt.Errorf("function %s requires varargs support", decl.Name())
 			}
 		default:
 			debugf("ignoring non-function declaration %s", decl.Name())
@@ -121,8 +122,7 @@ func parseCFuncs(fileName string) ([]FunctionDecl, error) {
 		}
 		returnType, err := returnTypeName(decln.DeclarationSpecifiers, decl.Pointer)
 		if err != nil {
-			debugf("skipping function '%s' due to error computing return type: %s", decl.Name(), err)
-			continue
+			return nil, fmt.Errorf("cannot resolve return type for function %s: %w", decl.Name(), err)
 		}
 		debugf("found function %s", decl.Name())
 		funcs = append(funcs, FunctionDecl{

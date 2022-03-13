@@ -1,5 +1,38 @@
+# layout
 nk_layout_.*
+
+# style
+nk_color_.*
+nk_(?:hsv|hsva|rgb|rgba)_.*
+nk_nine_slice.*
 nk_style_.*
+nk_(?:sub)?image_.*
+nk_sub9slice_.*
+
+# widgets
+nk_button_.*
+nk_chart_.*
+nk_check(?:box)?_.*
+nk_color_pick(?:er)
+nk_combo(?:box)?_.*
+nk_contextual_.*
+nk_edit_.*
+nk_menu(?:bar)?_.*
+nk_popup_.*
+nk_prog(?:ress)?
+nk_property.*
+nk_(?:radio|option)_.*
+nk_select(?:able)?_.*
+nk_slider?_.*
+nk_text_.*
+nk_tooltip.*
+
+# permabanned: C-style NUL-terminated strings
+!.*label.*
+!.*zero_terminated.*
+
+# permabanned: glyphs < runes
+!.*glyph.*
 
 # TODO need to convert struct nk_style_item for these
 !nk_style_item_color
@@ -17,3 +50,10 @@ nk_style_.*
 
 # TODO need to convert type nk_flags for these
 !nk_style_push_flags
+
+# TODO these rely on function pointers
+!nk_combo_callback
+!nk_combobox_callback
+!nk_edit_buffer
+!nk_edit_string
+!nk_plot_function

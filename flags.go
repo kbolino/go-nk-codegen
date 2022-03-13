@@ -13,6 +13,6 @@ var (
 	flagPatterns = flag.String("patterns", "patterns.txt", "path to file containing regexps to match against C "+
 		"function names, one per line; empty lines ignored, comment lines start with #, and negated lines with !; "+
 		"patterns implicitly start with ^ and end with $, use .* to unanchor them")
-	flagTypemap = flag.String("typemap", "typemap.txt", "path to file containing type mappings from C to Go and cgo; "+
+	flagTypemap = flag.String("typemap", "typemap.csv", "path to file containing type mappings from C to Go and cgo; "+
 		"one mapping per line; CSV format 'ctype,gotype,cgotype'; empty lines ignored, comment lines start with #")
 )
