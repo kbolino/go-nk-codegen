@@ -25,14 +25,22 @@ const (
 )
 
 func convertType(typeMap map[string]TypeConv, cType string, options ConvertTypeOpts) (goType string, cgoType string, err error) {
-	debugf("converting type '%s'", cType)
+	defer func() {
+		if err == nil {
+			debugf("converted C type '%s' to Go type '%s' and cgo type '%s'", cType, goType, cgoType)
+		}
+	}()
+	return _convertType(typeMap, cType, options)
+}
+
+func _convertType(typeMap map[string]TypeConv, cType string, options ConvertTypeOpts) (goType string, cgoType string, err error) {
 	cType = strings.TrimPrefix(cType, "const ")
 	if mapping, ok := typeMap[cType]; ok {
 		return mapping.GoType, mapping.CgoType, nil
 	}
 	if options&ConvertTypeAutoPtr != 0 && strings.HasSuffix(cType, "*") {
 		cType = strings.TrimSpace(strings.TrimSuffix(cType, "*"))
-		rawGoType, rawCgoType, err := convertType(typeMap, cType, options)
+		rawGoType, rawCgoType, err := _convertType(typeMap, cType, options)
 		if err != nil {
 			return "", "", fmt.Errorf("resolving type '%s': %w", cType, err)
 		}
