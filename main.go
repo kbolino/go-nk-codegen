@@ -61,15 +61,45 @@ func run() error {
 		goParamTypes := make([]string, len(f.Params)-1)
 		goParams := make([]string, len(f.Params)-1)
 		cParams := make([]string, len(f.Params))
+		goNameCounts := make(map[string]int)
 		for i := 1; i < len(f.Params); i++ {
 			cParam := f.Params[i]
 			goType, cgoType, err := convertType(typeMap, cParam.Type, ConvertTypeDefault)
 			if err != nil {
 				return fmt.Errorf("converting type '%s' of parameter %d of function %s: %w", cParam.Type, i, f.Name, err)
 			}
+
 			goName := strcase.ToLowerCamel(cParam.Name)
 			if goName == "" {
-				goName = fmt.Sprintf("param%d", i)
+				semanticType := goType
+				for strings.HasPrefix(semanticType, "*") {
+					semanticType = strings.TrimPrefix(semanticType, "*")
+				}
+				goName = strcase.ToLowerCamel(semanticType)
+			}
+			switch goName {
+			case "string":
+				goName = "s"
+			case "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "int", "uint":
+				goName = "n"
+			case "bool":
+				goName = "b"
+			case "float32", "float64":
+				goName = "x"
+			case "len":
+				goName = "length"
+			case "cap":
+				goName = "capacity"
+			case "copy":
+				goName = "cpy"
+			case "make":
+				goName = "mk"
+			case "new":
+				goName = "nw"
+			}
+			goNameCounts[goName]++
+			if nameCount := goNameCounts[goName]; nameCount > 1 {
+				goName = fmt.Sprintf("%s%d", goName, nameCount)
 			}
 			goParamTypes[i-1] = goType
 			goParams[i-1] = fmt.Sprintf("%s %s", goName, goType)

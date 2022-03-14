@@ -41,15 +41,15 @@ nk_tooltip.*
 !nk_style_item_nine_slice
 !nk_style_push_style_item
 
+# TODO need to convert struct nk_style_button for these
+!nk_button.*_styled
+
 # TODO need to convert struct nk_cursor for these
 !nk_style_load_all_cursors
 !nk_style_load_cursor
 
 # TODO need to convert enum nk_style_cursor for these
 !nk_style_set_cursor
-
-# TODO need to convert type nk_flags for these
-!nk_style_push_flags
 
 # TODO these rely on function pointers
 !nk_combo_callback
