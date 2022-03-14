@@ -33,7 +33,7 @@ func run() error {
 	funcs, err := parseCFuncs(*flagHeader, func(name string) bool {
 		skip := true
 		for _, pattern := range patterns {
-			if match := pattern.Regexp.FindStringIndex(name); match == nil {
+			if match := pattern.Regexp.FindString(name); match != name {
 				continue
 			}
 			if pattern.Negate {

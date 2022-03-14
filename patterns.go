@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"strings"
 )
 
 type Pattern struct {
@@ -34,18 +33,9 @@ func parsePatterns(fileName string) ([]Pattern, error) {
 			negate = true
 			line = bytes.TrimSpace(line[1:])
 		}
-		var buf strings.Builder
-		if !bytes.HasPrefix(line, []byte{'^'}) {
-			buf.WriteByte('^')
-		}
-		buf.Write(line)
-		if !bytes.HasSuffix(line, []byte{'$'}) {
-			buf.WriteByte('$')
-		}
-		pattern := buf.String()
-		re, err := regexp.Compile(pattern)
+		re, err := regexp.Compile(string(line))
 		if err != nil {
-			return nil, fmt.Errorf("compiling line %d as '%s': %w", lineNum, pattern, err)
+			return nil, fmt.Errorf("compiling line %d: %w", lineNum, err)
 		}
 		patterns = append(patterns, Pattern{
 			Regexp: re,

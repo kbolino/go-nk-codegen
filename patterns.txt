@@ -28,8 +28,8 @@ nk_text_.*
 nk_tooltip.*
 
 # permabanned: C-style NUL-terminated strings
-!.*label.*
-!.*zero_terminated.*
+!.*_label(?:_.*|$)
+!.*_zero_terminated(?:_.*|$)
 
 # permabanned: glyphs < runes
 !.*glyph.*
