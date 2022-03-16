@@ -7,6 +7,11 @@ import (
 	"modernc.org/cc/v3"
 )
 
+type EnumDecl struct {
+	Name      string
+	Constants []string
+}
+
 type FunctionDecl struct {
 	Name   string
 	Return string
@@ -18,11 +23,88 @@ type FunctionParam struct {
 	Type string
 }
 
-func parseCFuncs(fileName string, skip func(name string) bool) ([]FunctionDecl, error) {
+type StructDecl struct {
+	Name    string
+	Members []StructMember
+}
+
+type StructMember struct {
+	Name string
+	Type string
+}
+
+type Matcher interface {
+	MatchEnum(name string) bool
+	MatchFunc(name string) bool
+	MatchStruct(name string) bool
+}
+
+type patternMatcher struct {
+	enumPatterns   []Pattern
+	funcPatterns   []Pattern
+	structPatterns []Pattern
+}
+
+func (m *patternMatcher) MatchEnum(name string) bool {
+	return m.match("enum", name, m.enumPatterns)
+}
+
+func (m *patternMatcher) MatchFunc(name string) bool {
+	return m.match("function", name, m.funcPatterns)
+}
+
+func (m *patternMatcher) MatchStruct(name string) bool {
+	return m.match("struct", name, m.structPatterns)
+}
+
+func (m *patternMatcher) match(what, name string, patterns []Pattern) bool {
+	if len(patterns) == 0 {
+		return false
+	}
+	include := false
+	for _, pattern := range patterns {
+		if match := pattern.Regexp.FindString(name); match == name {
+			if pattern.Negate {
+				include = false
+				debugf("excluding %s %s because of negated pattern '%s'", what, name, pattern.Regexp)
+			} else {
+				include = true
+				debugf("including %s %s because of pattern '%s'", what, name, pattern.Regexp)
+			}
+		}
+	}
+	return include
+}
+
+func NewPatternMatcher(enumPatterns, funcPatterns, structPatterns []Pattern) Matcher {
+	return &patternMatcher{
+		enumPatterns:   enumPatterns,
+		funcPatterns:   funcPatterns,
+		structPatterns: structPatterns,
+	}
+}
+
+type Parser struct {
+	matcher Matcher
+}
+
+func NewParser(matcher Matcher) *Parser {
+	return &Parser{
+		matcher: matcher,
+	}
+}
+
+type ParseResult struct {
+	Enums   []EnumDecl
+	Funcs   []FunctionDecl
+	Structs []StructDecl
+}
+
+func (p *Parser) Parse(fileName string) (ParseResult, error) {
 	debug("determing host configuration from C preprocessor")
 	predefined, includePaths, sysIncludePaths, err := cc.HostConfig(*flagCPP)
 	if err != nil {
-		return nil, fmt.Errorf("obtaining host configuration: %w", err)
+		return ParseResult{}, fmt.Errorf("obtaining host configuration: %w", err)
 	}
 	debugf("predefined = %s", predefined)
 	debugf("includePaths = %v", includePaths)
@@ -39,7 +121,7 @@ func parseCFuncs(fileName string, skip func(name string) bool) ([]FunctionDecl, 
 	cfg := &cc.Config{}
 	ast, err := cc.Parse(cfg, includePaths, sysIncludePaths, sources)
 	if err != nil {
-		return nil, fmt.Errorf("parsing sources: %w", err)
+		return ParseResult{}, fmt.Errorf("parsing sources: %w", err)
 	}
 	var funcs []FunctionDecl
 	// translation_unit
@@ -87,7 +169,7 @@ func parseCFuncs(fileName string, skip func(name string) bool) ([]FunctionDecl, 
 		//   | direct_declarator
 		//   ;
 		decl := idecl.Declarator
-		if skip(decl.Name().String()) {
+		if !p.matcher.MatchFunc(decl.Name().String()) {
 			continue
 		}
 		// direct_declarator
@@ -111,10 +193,10 @@ func parseCFuncs(fileName string, skip func(name string) bool) ([]FunctionDecl, 
 			case cc.ParameterTypeListList:
 				params, err = makeFuncParams(ddecl.ParameterTypeList.ParameterList)
 				if err != nil {
-					return nil, fmt.Errorf("cannot resolve parameters for function %s: %w", decl.Name(), err)
+					return ParseResult{}, fmt.Errorf("cannot resolve parameters for function %s: %w", decl.Name(), err)
 				}
 			case cc.ParameterTypeListVar:
-				return nil, fmt.Errorf("function %s requires varargs support", decl.Name())
+				return ParseResult{}, fmt.Errorf("function %s requires varargs support", decl.Name())
 			}
 		default:
 			debugf("ignoring non-function declaration %s", decl.Name())
@@ -122,7 +204,7 @@ func parseCFuncs(fileName string, skip func(name string) bool) ([]FunctionDecl, 
 		}
 		returnType, err := returnTypeName(decln.DeclarationSpecifiers, decl.Pointer)
 		if err != nil {
-			return nil, fmt.Errorf("cannot resolve return type for function %s: %w", decl.Name(), err)
+			return ParseResult{}, fmt.Errorf("cannot resolve return type for function %s: %w", decl.Name(), err)
 		}
 		debugf("found function %s", decl.Name())
 		funcs = append(funcs, FunctionDecl{
@@ -134,5 +216,7 @@ func parseCFuncs(fileName string, skip func(name string) bool) ([]FunctionDecl, 
 	sort.Slice(funcs, func(i, j int) bool {
 		return funcs[i].Name < funcs[j].Name
 	})
-	return funcs, nil
+	return ParseResult{
+		Funcs: funcs,
+	}, nil
 }

@@ -18,9 +18,9 @@ func main() {
 }
 
 func run() error {
-	patterns, err := parsePatterns(*flagPatterns)
+	funcPatterns, err := parsePatterns(*flagFuncs)
 	if err != nil {
-		return fmt.Errorf("parsing patterns in file '%s': %w", *flagPatterns, err)
+		return fmt.Errorf("parsing function patterns in file '%s': %w", *flagFuncs, err)
 	}
 	done, err := parseDone(*flagDone)
 	if err != nil {
@@ -30,22 +30,8 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("parsing typemap in file '%s': %w", *flagTypemap, err)
 	}
-	funcs, err := parseCFuncs(*flagHeader, func(name string) bool {
-		skip := true
-		for _, pattern := range patterns {
-			if match := pattern.Regexp.FindString(name); match != name {
-				continue
-			}
-			if pattern.Negate {
-				debugf("skipping function %s because of negated pattern %s", name, pattern.Regexp)
-				skip = true
-			} else {
-				debugf("including function %s because of pattern %s", name, pattern.Regexp)
-				skip = false
-			}
-		}
-		return skip
-	})
+	parser := NewParser(NewPatternMatcher(nil, funcPatterns, nil))
+	result, err := parser.Parse(*flagHeader)
 	if err != nil {
 		return fmt.Errorf("parsing C functions in file '%s': %w", *flagHeader, err)
 	}
@@ -58,7 +44,7 @@ func run() error {
 	fmt.Println(`import "C"`)
 	fmt.Println()
 	fmt.Println(`import "unsafe"`)
-	for _, f := range funcs {
+	for _, f := range result.Funcs {
 		if err := printFunc(typeMap, done, &f, "", false); err != nil {
 			return fmt.Errorf("printing definition of function %s: %w", f.Name, err)
 		}
