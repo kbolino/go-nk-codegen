@@ -10,6 +10,7 @@ void *,unsafe.Pointer,
 
 # 1-byte types
 nk_bool,bool,C.nk_bool
+char **,,
 char *,string,C.CString
 char,byte,C.char
 nk_byte,byte,C.nk_byte

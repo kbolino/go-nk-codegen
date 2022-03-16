@@ -1,2 +1,4 @@
 /go-nk-codegen
 *.exe
+debug*.txt
+output*.txt
