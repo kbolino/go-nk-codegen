@@ -18,6 +18,10 @@ func main() {
 }
 
 func run() error {
+	enumPatterns, err := parsePatterns(*flagEnums)
+	if err != nil {
+		return fmt.Errorf("parsing enum patterns in file '%s': %w", *flagEnums, err)
+	}
 	funcPatterns, err := parsePatterns(*flagFuncs)
 	if err != nil {
 		return fmt.Errorf("parsing function patterns in file '%s': %w", *flagFuncs, err)
@@ -30,7 +34,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("parsing typemap in file '%s': %w", *flagTypemap, err)
 	}
-	parser := NewParser(NewPatternMatcher(nil, funcPatterns, nil))
+	parser := NewParser(NewPatternMatcher(enumPatterns, funcPatterns, nil))
 	result, err := parser.Parse(*flagHeader)
 	if err != nil {
 		return fmt.Errorf("parsing C functions in file '%s': %w", *flagHeader, err)

@@ -8,6 +8,8 @@ var (
 	flagDone  = flag.String("done", "done.txt", "path to file containing function signatures that have alread been "+
 		"migrated; empty lines ignored, comment lines start with #; no receiver names, parameter names, newlines, "+
 		"trailing commas, or return names")
+	flagEnums = flag.String("enums", "enums.txt", "path to file containing regexps to match againsg C enums; same "+
+		"syntax as -funcs")
 	flagFuncs = flag.String("funcs", "funcs.txt", "path to file containing regexps to match against C function "+
 		"names, one per line; empty lines ignored, comment lines start with #, and negated lines with !; patterns "+
 		"must match entire function name")

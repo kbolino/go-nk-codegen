@@ -7,6 +7,8 @@ import (
 	"modernc.org/cc/v3"
 )
 
+const Anonymous = "(anonymous)"
+
 type EnumDecl struct {
 	Name      string
 	Constants []string
@@ -62,16 +64,22 @@ func (m *patternMatcher) match(what, name string, patterns []Pattern) bool {
 		return false
 	}
 	include := false
+	anyMatch := false
 	for _, pattern := range patterns {
 		if match := pattern.Regexp.FindString(name); match == name {
 			if pattern.Negate {
 				include = false
+				anyMatch = true
 				debugf("excluding %s %s because of negated pattern '%s'", what, name, pattern.Regexp)
 			} else {
 				include = true
+				anyMatch = true
 				debugf("including %s %s because of pattern '%s'", what, name, pattern.Regexp)
 			}
 		}
+	}
+	if !anyMatch {
+		debugf("excluding %s %s because no patterns matched it", what, name)
 	}
 	return include
 }
@@ -123,7 +131,9 @@ func (p *Parser) Parse(fileName string) (ParseResult, error) {
 	if err != nil {
 		return ParseResult{}, fmt.Errorf("parsing sources: %w", err)
 	}
+	var enums []EnumDecl
 	var funcs []FunctionDecl
+	var structs []StructDecl
 	// translation_unit
 	//   : external_declaration
 	//   | translation_unit external_declaration
@@ -144,7 +154,35 @@ func (p *Parser) Parse(fileName string) (ParseResult, error) {
 		//   ;
 		idl := decln.InitDeclaratorList
 		if idl == nil {
-			// no declarator
+			// no declarator, so not a function, could be enum or struct
+
+			// declaration_specifiers
+			//   : storage_class_specifier
+			//   | storage_class_specifier declaration_specifiers
+			//   | type_specifier
+			//   | type_specifier declaration_specifiers
+			//   | type_qualifier
+			//   | type_qualifier declaration_specifiers
+			//   ;
+			for ds := decln.DeclarationSpecifiers; ds != nil; ds = ds.DeclarationSpecifiers {
+				if ts := ds.TypeSpecifier; ts != nil && ts.Case == cc.TypeSpecifierEnum {
+					enumDecl, err := p.parseEnum(decln)
+					if err != nil {
+						return ParseResult{}, fmt.Errorf("parsing enum at position %s: %w", tu.Position(), err)
+					}
+					if enumDecl.Name != "" {
+						enums = append(enums, enumDecl)
+					}
+				} else if ts != nil && ts.Case == cc.TypeSpecifierStructOrUnion {
+					structDecl, err := p.parseStruct(decln)
+					if err != nil {
+						return ParseResult{}, fmt.Errorf("parsing struct at position %s: %w", tu.Position(), err)
+					}
+					if structDecl.Name != "" {
+						structs = append(structs, structDecl)
+					}
+				}
+			}
 			continue
 		}
 		// init_declarator_list
@@ -169,9 +207,6 @@ func (p *Parser) Parse(fileName string) (ParseResult, error) {
 		//   | direct_declarator
 		//   ;
 		decl := idecl.Declarator
-		if !p.matcher.MatchFunc(decl.Name().String()) {
-			continue
-		}
 		// direct_declarator
 		//   : IDENTIFIER
 		//   | '(' declarator ')'
@@ -185,6 +220,10 @@ func (p *Parser) Parse(fileName string) (ParseResult, error) {
 		ddecl := decl.DirectDeclarator
 		switch ddecl.Case {
 		case cc.DirectDeclaratorFuncParam:
+			debugf("found function %s at %s", decl.Name(), decl.Position())
+			if !p.matcher.MatchFunc(decl.Name().String()) {
+				continue
+			}
 			// parameter_type_list
 			//   : parameter_list
 			//   | parameter_list ',' ELLIPSIS
@@ -199,14 +238,13 @@ func (p *Parser) Parse(fileName string) (ParseResult, error) {
 				return ParseResult{}, fmt.Errorf("function %s requires varargs support", decl.Name())
 			}
 		default:
-			debugf("ignoring non-function declaration %s", decl.Name())
+			debugf("ignoring non-function declaration %s at %s", decl.Name(), decl.Position())
 			continue
 		}
 		returnType, err := returnTypeName(decln.DeclarationSpecifiers, decl.Pointer)
 		if err != nil {
 			return ParseResult{}, fmt.Errorf("cannot resolve return type for function %s: %w", decl.Name(), err)
 		}
-		debugf("found function %s", decl.Name())
 		funcs = append(funcs, FunctionDecl{
 			Name:   decl.Name().String(),
 			Return: returnType,
@@ -217,6 +255,56 @@ func (p *Parser) Parse(fileName string) (ParseResult, error) {
 		return funcs[i].Name < funcs[j].Name
 	})
 	return ParseResult{
-		Funcs: funcs,
+		Enums:   enums,
+		Funcs:   funcs,
+		Structs: structs,
 	}, nil
+}
+
+func (p *Parser) parseEnum(decln *cc.Declaration) (EnumDecl, error) {
+	// enum_specifier
+	//   : ENUM '{' enumerator_list '}'
+	//   | ENUM IDENTIFIER '{' enumerator_list '}'
+	//   | ENUM IDENTIFIER
+	//   ;
+	for ds := decln.DeclarationSpecifiers; ds != nil; ds = ds.DeclarationSpecifiers {
+		if ts := ds.TypeSpecifier; ts == nil {
+			continue
+		} else if es := ts.EnumSpecifier; es == nil {
+			continue
+		} else if es.Case != cc.EnumSpecifierDef {
+			return EnumDecl{}, nil
+		} else {
+			name := es.Token2.String()
+			if name == "" {
+				name = Anonymous
+			}
+			debugf("found enum %s at %s", name, es.Position())
+			if !p.matcher.MatchEnum(name) {
+				return EnumDecl{}, nil
+			}
+			// enumerator_list
+			//   : enumerator
+			//   | enumerator_list ',' enumerator
+			//   ;
+			// enumerator
+			//   : IDENTIFIER
+			//   | IDENTIFIER '=' constant_expression
+			//   ;
+			var constants []string
+			for el := es.EnumeratorList; el != nil; el = el.EnumeratorList {
+				constants = append(constants, el.Enumerator.Token.String())
+			}
+			return EnumDecl{
+				Name:      name,
+				Constants: constants,
+			}, nil
+		}
+	}
+	return EnumDecl{}, nil
+}
+
+func (p *Parser) parseStruct(decln *cc.Declaration) (StructDecl, error) {
+	// TODO
+	return StructDecl{}, nil
 }
