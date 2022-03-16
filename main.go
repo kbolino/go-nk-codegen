@@ -49,19 +49,16 @@ func run() error {
 	fmt.Println()
 	fmt.Println(`import "unsafe"`)
 	for _, f := range result.Funcs {
-		if err := printFunc(typeMap, done, &f, "", false); err != nil {
+		if err := printFunc(typeMap, done, &f, ""); err != nil {
 			return fmt.Errorf("printing definition of function %s: %w", f.Name, err)
 		}
 	}
 	return nil
 }
 
-func printFunc(typeMap map[string]TypeConv, done map[string]struct{}, f *FunctionDecl, doc string, stringToBytes bool) error {
+func printFunc(typeMap map[string]TypeConv, done map[string]struct{}, f *FunctionDecl, doc string) error {
 	nakedName := strings.TrimPrefix(f.Name, "nk_")
 	goFuncName := strcase.ToCamel(nakedName)
-	if stringToBytes {
-		goFuncName = goFuncName + "Bytes"
-	}
 	method := true
 	goParamOffset := 1
 	if len(f.Params) == 0 || f.Params[0].Type != "struct nk_context *" {
@@ -74,7 +71,6 @@ func printFunc(typeMap map[string]TypeConv, done map[string]struct{}, f *Functio
 	goParams := make([]string, len(f.Params)-goParamOffset)
 	cParams := make([]string, len(f.Params))
 	goNameCounts := make(map[string]int)
-	hasCStringParams := false
 	var preamble strings.Builder
 	for i := goParamOffset; i < len(f.Params); i++ {
 		// convert type
@@ -118,20 +114,19 @@ func printFunc(typeMap map[string]TypeConv, done map[string]struct{}, f *Functio
 		}
 		goNameCounts[goName]++
 		if nameCount := goNameCounts[goName]; nameCount > 1 {
-			goName = fmt.Sprintf("%s%d", goName, nameCount)
+			end := goName[len(goName)-1]
+			if '0' <= end && end <= '9' {
+				goName = fmt.Sprintf("%s_%d", goName, nameCount)
+			} else {
+				goName = fmt.Sprintf("%s%d", goName, nameCount)
+			}
 		}
 		// check for CStrings
 		if cgoType == "C.CString" {
-			if stringToBytes {
-				goType = "[]byte"
-				cParams[cParamIndex] = fmt.Sprintf("(*C.char)(unsafe.Pointer(&%s[0]))", goName)
-			} else {
-				rawName := fmt.Sprintf("raw%s", strcase.ToCamel(goName))
-				fmt.Fprintf(&preamble, "\t%s := C.CString(%s)\n", rawName, goName)
-				fmt.Fprintf(&preamble, "\tdefer C.free(unsafe.Pointer(%s))\n", rawName)
-				hasCStringParams = true
-				cParams[cParamIndex] = rawName
-			}
+			rawName := fmt.Sprintf("raw%s", strcase.ToCamel(goName))
+			fmt.Fprintf(&preamble, "\t%s := cStringPool.Get(%s)\n", rawName, goName)
+			fmt.Fprintf(&preamble, "\tdefer cStringPool.Release(%s)\n", rawName)
+			cParams[cParamIndex] = rawName
 			// skip over the next param in the normal loop
 			i++
 			nextCParamIndex := i
@@ -224,10 +219,5 @@ func printFunc(typeMap map[string]TypeConv, done map[string]struct{}, f *Functio
 		}
 	}
 	fmt.Println("}")
-	if !stringToBytes && hasCStringParams {
-		bytesDoc := fmt.Sprintf("%sBytes is like %s except that it does not copy string parameters.",
-			goFuncName, goFuncName)
-		printFunc(typeMap, done, f, bytesDoc, true)
-	}
 	return nil
 }
