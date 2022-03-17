@@ -9,7 +9,7 @@ var (
 		"syntax as -funcs")
 	flagFuncs = flag.String("funcs", "funcs.txt", "path to file containing regexps to match against C function "+
 		"names, one per line; empty lines ignored, comment lines start with #, and negated lines with !; patterns "+
-		"must match entire function name")
+		"must match entire function name; set attributes with #attrs: key[=value][,...]")
 	flagHeader  = flag.String("header", "nk.h", "path to nk.h header")
 	flagInclude = flag.String("include", "", "append to include path")
 	flagPackage = flag.String("package", "nk", "package name; short name, not full path")
