@@ -79,3 +79,11 @@ nk_text_.*
 
 # TODO takes pointer to size_t
 !nk_progress
+
+# already done
+!nk_button_text
+!nk_check_text
+!nk_layout_row_static
+!nk_layout_row_dynamic
+!nk_style_set_font
+!nk_text

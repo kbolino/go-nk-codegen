@@ -5,9 +5,6 @@ import "flag"
 var (
 	flagCPP   = flag.String("cpp", "cpp", "path to the C preprocessor")
 	flagDebug = flag.Bool("debug", false, "enable debug logging")
-	flagDone  = flag.String("done", "done.txt", "path to file containing function signatures that have alread been "+
-		"migrated; empty lines ignored, comment lines start with #; no receiver names, parameter names, newlines, "+
-		"trailing commas, or return names")
 	flagEnums = flag.String("enums", "enums.txt", "path to file containing regexps to match againsg C enums; same "+
 		"syntax as -funcs")
 	flagFuncs = flag.String("funcs", "funcs.txt", "path to file containing regexps to match against C function "+

@@ -26,10 +26,6 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("parsing function patterns in file '%s': %w", *flagFuncs, err)
 	}
-	done, err := parseDone(*flagDone)
-	if err != nil {
-		return fmt.Errorf("parsing done signatures in file '%s': %w", *flagDone, err)
-	}
 	typeMap, err := parseTypeMap(*flagTypemap)
 	if err != nil {
 		return fmt.Errorf("parsing typemap in file '%s': %w", *flagTypemap, err)
@@ -49,14 +45,14 @@ func run() error {
 	fmt.Println()
 	fmt.Println(`import "unsafe"`)
 	for _, f := range result.Funcs {
-		if err := printFunc(typeMap, done, &f, ""); err != nil {
+		if err := printFunc(typeMap, f, ""); err != nil {
 			return fmt.Errorf("printing definition of function %s: %w", f.Name, err)
 		}
 	}
 	return nil
 }
 
-func printFunc(typeMap map[string]TypeConv, done map[string]struct{}, f *FunctionDecl, doc string) error {
+func printFunc(typeMap map[string]TypeConv, f FunctionDecl, doc string) error {
 	nakedName := strings.TrimPrefix(f.Name, "nk_")
 	goFuncName := strcase.ToCamel(nakedName)
 	method := true
@@ -173,21 +169,6 @@ func printFunc(typeMap map[string]TypeConv, done map[string]struct{}, f *Functio
 	retType, _, err := convertType(typeMap, f.Return, ConvertTypeDefault)
 	if err != nil {
 		return fmt.Errorf("converting type '%s' of return: %w", f.Return, err)
-	}
-	anonMethodReceiver := ""
-	if method {
-		anonMethodReceiver = "(*Context) "
-	}
-	paramTypeList := strings.Join(goParamTypes, ", ")
-	signature := ""
-	if retType == "" {
-		signature = fmt.Sprintf("func %s%s(%s)", anonMethodReceiver, goFuncName, paramTypeList)
-	} else {
-		signature = fmt.Sprintf("func %s%s(%s) %s", anonMethodReceiver, goFuncName, paramTypeList, retType)
-	}
-	if _, ok := done[signature]; ok {
-		debugf("skipping function %s because it matches done signature '%s'", goFuncName, signature)
-		return nil
 	}
 	namedMethodReceiver := ""
 	if method {
