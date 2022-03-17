@@ -1,1 +1,5 @@
-.*
+nk_.*
+
+#attrs: untyped
+nk_.*_flags
+#attrs:

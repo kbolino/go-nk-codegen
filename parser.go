@@ -12,12 +12,14 @@ const Anonymous = "(anonymous)"
 type EnumDecl struct {
 	Name      string
 	Constants []string
+	Attrs     map[string]string
 }
 
 type FunctionDecl struct {
 	Name   string
 	Return string
 	Params []FunctionParam
+	Attrs  map[string]string
 }
 
 type FunctionParam struct {
@@ -28,6 +30,7 @@ type FunctionParam struct {
 type StructDecl struct {
 	Name    string
 	Members []StructMember
+	Attrs   map[string]string
 }
 
 type StructMember struct {
@@ -36,9 +39,9 @@ type StructMember struct {
 }
 
 type Matcher interface {
-	MatchEnum(name string) bool
-	MatchFunc(name string) bool
-	MatchStruct(name string) bool
+	MatchEnum(name string) (attrs map[string]string, ok bool)
+	MatchFunc(name string) (attrs map[string]string, ok bool)
+	MatchStruct(name string) (attrs map[string]string, ok bool)
 }
 
 type patternMatcher struct {
@@ -47,21 +50,21 @@ type patternMatcher struct {
 	structPatterns []Pattern
 }
 
-func (m *patternMatcher) MatchEnum(name string) bool {
+func (m *patternMatcher) MatchEnum(name string) (attrs map[string]string, ok bool) {
 	return m.match("enum", name, m.enumPatterns)
 }
 
-func (m *patternMatcher) MatchFunc(name string) bool {
+func (m *patternMatcher) MatchFunc(name string) (attrs map[string]string, ok bool) {
 	return m.match("function", name, m.funcPatterns)
 }
 
-func (m *patternMatcher) MatchStruct(name string) bool {
+func (m *patternMatcher) MatchStruct(name string) (attrs map[string]string, ok bool) {
 	return m.match("struct", name, m.structPatterns)
 }
 
-func (m *patternMatcher) match(what, name string, patterns []Pattern) bool {
+func (m *patternMatcher) match(what, name string, patterns []Pattern) (attrs map[string]string, ok bool) {
 	if len(patterns) == 0 {
-		return false
+		return nil, false
 	}
 	include := false
 	anyMatch := false
@@ -75,13 +78,19 @@ func (m *patternMatcher) match(what, name string, patterns []Pattern) bool {
 				include = true
 				anyMatch = true
 				debugf("including %s %s because of pattern '%s'", what, name, pattern.Regexp)
+				if len(pattern.Attrs) != 0 && attrs == nil {
+					attrs = make(map[string]string)
+				}
+				for key, value := range pattern.Attrs {
+					attrs[key] = value
+				}
 			}
 		}
 	}
 	if !anyMatch {
 		debugf("excluding %s %s because no patterns matched it", what, name)
 	}
-	return include
+	return attrs, include
 }
 
 func NewPatternMatcher(enumPatterns, funcPatterns, structPatterns []Pattern) Matcher {
@@ -217,11 +226,13 @@ func (p *Parser) Parse(fileName string) (ParseResult, error) {
 		//   | direct_declarator '(' ')'
 		//   ;
 		var params []FunctionParam
+		var attrs map[string]string
 		ddecl := decl.DirectDeclarator
 		switch ddecl.Case {
 		case cc.DirectDeclaratorFuncParam:
 			debugf("found function %s at %s", decl.Name(), decl.Position())
-			if !p.matcher.MatchFunc(decl.Name().String()) {
+			var ok bool
+			if attrs, ok = p.matcher.MatchFunc(decl.Name().String()); !ok {
 				continue
 			}
 			// parameter_type_list
@@ -249,6 +260,7 @@ func (p *Parser) Parse(fileName string) (ParseResult, error) {
 			Name:   decl.Name().String(),
 			Return: returnType,
 			Params: params,
+			Attrs:  attrs,
 		})
 	}
 	sort.Slice(funcs, func(i, j int) bool {
@@ -280,7 +292,8 @@ func (p *Parser) parseEnum(decln *cc.Declaration) (EnumDecl, error) {
 				name = Anonymous
 			}
 			debugf("found enum %s at %s", name, es.Position())
-			if !p.matcher.MatchEnum(name) {
+			attrs, ok := p.matcher.MatchEnum(name)
+			if !ok {
 				return EnumDecl{}, nil
 			}
 			// enumerator_list
@@ -298,6 +311,7 @@ func (p *Parser) parseEnum(decln *cc.Declaration) (EnumDecl, error) {
 			return EnumDecl{
 				Name:      name,
 				Constants: constants,
+				Attrs:     attrs,
 			}, nil
 		}
 	}

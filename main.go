@@ -40,15 +40,59 @@ func run() error {
 	fmt.Println("// GENERATED CODE -- DO NOT EDIT")
 	fmt.Println()
 	fmt.Println(`// #include "nk.h"`)
-	fmt.Println("// #include <stdlib.h>")
 	fmt.Println(`import "C"`)
 	fmt.Println()
 	fmt.Println(`import "unsafe"`)
+	for _, e := range result.Enums {
+		if err := printEnum(e); err != nil {
+			return fmt.Errorf("printing definition of enum %s: %w", e.Name, err)
+		}
+	}
 	for _, f := range result.Funcs {
 		if err := printFunc(typeMap, f, ""); err != nil {
 			return fmt.Errorf("printing definition of function %s: %w", f.Name, err)
 		}
 	}
+	return nil
+}
+
+func printEnum(e EnumDecl) error {
+	typeName := strcase.ToCamel(strings.TrimPrefix(e.Name, "nk_"))
+	untyped := false
+	if _, ok := e.Attrs[AttrUntyped]; ok {
+		untyped = true
+	}
+	var names []string
+	var maxNameLen int
+	for _, con := range e.Constants {
+		name := strcase.ToCamel(strings.ToLower(strings.TrimPrefix(con, "NK_")))
+		// fix some common acronyms
+		name = strings.ReplaceAll(name, "Uv", "UV")
+		name = strings.ReplaceAll(name, "Rgba", "RGBA")
+		name = strings.ReplaceAll(name, "Rgb", "RGB")
+		names = append(names, name)
+		if len(name) > maxNameLen {
+			maxNameLen = len(name)
+		}
+	}
+	if !untyped {
+		fmt.Println()
+		fmt.Printf("// %s is equivalent to enum %s.\n", typeName, e.Name)
+		fmt.Printf("type %s int32\n", typeName)
+	}
+	fmt.Println()
+	if untyped {
+		fmt.Printf("// constants for enum %s:\n", e.Name)
+	}
+	fmt.Println("const (")
+	for i, name := range names {
+		if untyped {
+			fmt.Printf("\t%*s = C.%s\n", -maxNameLen, name, e.Constants[i])
+		} else {
+			fmt.Printf("\t%*s %s = C.%s\n", -maxNameLen, name, typeName, e.Constants[i])
+		}
+	}
+	fmt.Println(")")
 	return nil
 }
 
@@ -123,25 +167,28 @@ func printFunc(typeMap map[string]TypeConv, f FunctionDecl, doc string) error {
 			fmt.Fprintf(&preamble, "\t%s := cStringPool.Get(%s)\n", rawName, goName)
 			fmt.Fprintf(&preamble, "\tdefer cStringPool.Release(%s)\n", rawName)
 			cParams[cParamIndex] = rawName
-			// skip over the next param in the normal loop
-			i++
-			nextCParamIndex := i
-			nextGoParamIndex := i - goParamOffset
-			// ensure it is an int
-			if nextCParamIndex >= len(f.Params) || f.Params[nextCParamIndex].Type != "int" {
-				return fmt.Errorf("string parameter %d is not followed by length param", i)
+			if _, ok := f.Attrs["nostrlen"]; !ok {
+				// skip over the next param in the normal loop
+				i++
+				nextCParamIndex := i
+				nextGoParamIndex := i - goParamOffset
+				// ensure it is an int
+				if nextCParamIndex >= len(f.Params) || f.Params[nextCParamIndex].Type != "int" {
+					return fmt.Errorf("string parameter %d is not followed by length param (set attr nostrlen to override)", i)
+				}
+				// synthesize a C parameter set to the string length
+				cParams[nextCParamIndex] = fmt.Sprintf("C.int(len(%s))", goName)
+				// put a sentinel value in for the Go parameter
+				goParams[nextGoParamIndex] = "__DELETED__"
 			}
-			// synthesize a C parameter set to the string length
-			cParams[nextCParamIndex] = fmt.Sprintf("C.int(len(%s))", goName)
-			// put a sentinel value in for the Go parameter
-			goParams[nextGoParamIndex] = "__DELETED__"
 		} else if len(cgoType) == 0 {
 			cParams[cParamIndex] = goName
 		} else if goType == "Handle" {
 			cParams[cParamIndex] = fmt.Sprintf("%s.raw()", goName)
 		} else {
 			var paramFormat string
-			if strings.HasPrefix(cgoType, "*C.struct_") {
+			_, hasAttrUnsafePtr := f.Attrs[AttrUnsafePtr]
+			if strings.HasPrefix(cgoType, "*C.struct_") || strings.HasPrefix(cgoType, "*") && hasAttrUnsafePtr {
 				paramFormat = "(%s)(unsafe.Pointer(%s))"
 			} else if strings.HasPrefix(cgoType, "C.struct_") {
 				paramFormat = "*(*%s)(unsafe.Pointer(&%s))"

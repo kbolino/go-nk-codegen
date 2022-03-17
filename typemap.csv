@@ -5,8 +5,8 @@
 # differ from the conventional mapping e.g. 'struct T,GoT,C.struct_T`
 
 # voids
+void *,,
 void,,
-void *,unsafe.Pointer,
 
 # 1-byte types
 nk_bool,bool,C.nk_bool

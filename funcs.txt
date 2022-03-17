@@ -24,23 +24,33 @@ nk_select(?:able)?_.*
 nk_slider?_.*
 nk_text_.*
 
+# C-style NUL-terminated strings, no alternatives exist
+#attrs: nostrlen
+nk_color_hex_rgb
+nk_color_hex_rgba
+nk_popup_.*
+nk_property.*
+nk_rgb_hex
+nk_rgba_hex
+nk_tooltip.*
+#attrs:
+
+# takes pointer to size_t
+#attrs: unsafeptr
+nk_progress
+#attrs:
+
 # permabanned: C-style NUL-terminated strings, alternatives exist
 !.*_label(?:_.*|$)
 !.*_zero_terminated(?:_.*|$)
 !nk_menu_begin_image
 !nk_menu_begin_symbol
 
-# TODO C-style NUL-terminated strings, no alternatives exist
-!nk_color_hex_rgb
-!nk_color_hex_rgba
-!nk_popup_.*
-!nk_property.*
-!nk_rgb_hex
-!nk_rgba_hex
-!nk_tooltip.*
+# permabanned: these use nk_glyph instead of nk_rune
+!(?:^|.*_)glyph(?:_.*|$)
 
-# permabanned: use nk_glyph instead of nk_rune
-!.*glyph.*
+# permabanned: these take void* params, nk_handle-based alternatives exist
+!nk_.*_ptr
 
 # TODO need to convert struct nk_style_item for these
 !nk_style_item_color
@@ -56,11 +66,8 @@ nk_text_.*
 !nk_style_load_all_cursors
 !nk_style_load_cursor
 
-# TODO need to convert nk_style_color for these
+# TODO need to convert struct nk_style_color for these
 !nk_style_get_color_by_name
-
-# TODO need to convert enum nk_style_cursor for these
-!nk_style_set_cursor
 
 # TODO these rely on function pointers
 !nk_combo_callback
@@ -76,9 +83,6 @@ nk_text_.*
 # TODO these rely on string arrays
 !nk_combo(?:box)?(?:_separator|_string)?
 !nk_combox(?:box)?(?:_separator|_string)?
-
-# TODO takes pointer to size_t
-!nk_progress
 
 # already done
 !nk_button_text
